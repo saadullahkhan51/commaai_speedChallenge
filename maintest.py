@@ -7,13 +7,15 @@
 
 import pandas as pd
 import Model
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import os
+import pickle
 
 data_size = 20400
-batch_size = 16
+batch_size = 32
 steps_per_epoch = data_size/ batch_size
 imgdir = "D:/venv/PyScripts/speedchallenge-master/data/data_preprocessed_dense" 
 
@@ -30,31 +32,45 @@ xTest = X[xTrain.size : X.size]
 yTest = X[yTrain.size : Y.size]
 
 
-imgBatch = np.zeros((len(xTrain), 66, 220, 3))
-labelBatch = np.zeros((len(yTrain)))
-
-# prints for debugging
-print(xTest[0])
-print(xTrain[-1])
-img = cv2.imread(X[0])
-print(img.shape)
-imgBatch[0] = img
-print(imgBatch[0].shape)
+imgBatch = np.zeros((len(X), 66, 220, 3))
+labelBatch = np.zeros((len(Y)))
 
 def GenerateTrainData():
-    for i in range (0, len(xTrain)):
+    for i in range (0, len(X)):
         try:
-            img = cv2.imread(xTrain[i])
+            img = cv2.imread(X[i])
             imgBatch[i] = img
-            labelBatch[i] = yTrain[i]
+            labelBatch[i] = Y[i]
             #print(imgBatch[i].shape)
         except Exception as e:
             pass
-GenerateTrainData()
 
+#GenerateTrainData()
 print(imgBatch.shape)
 print(labelBatch.shape)
 
-myModel = Model.NVIDIA_model()
-history = myModel.fit(imgBatch, labelBatch ,batch_size= batch_size, epochs= 30)
-print(history)
+
+
+if __name__ == "__main__":
+    filepath = './model_weights/weights.{epoch:02d}-{val_loss:.2f}.hdf5'
+    GenerateTrainData()
+    print(imgBatch.shape)
+    print(labelBatch.shape)
+    myModel = Model.Pooled_model()
+    earlyStopping = EarlyStopping(monitor='val_loss', 
+                              patience=2, 
+                              verbose=1, 
+                              min_delta = 0.23,
+                              mode='min',)
+    modelCheckpoint = ModelCheckpoint(filepath = filepath, 
+                                      monitor = 'val_loss', 
+                                      save_best_only = True, 
+                                      mode = 'min', 
+                                      verbose = 1,
+                                     save_weights_only = True)
+    callbacks_list = [modelCheckpoint, earlyStopping]
+    history = myModel.fit(imgBatch, labelBatch ,batch_size= batch_size, epochs= 10, validation_split= 0.1, callbacks= callbacks_list)
+    score = myModel.evaluate(imgBatch, labelBathc, verbose = 0)
+    print(score)
+    print(history)
+    
